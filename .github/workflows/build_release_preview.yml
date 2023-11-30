@@ -5,6 +5,7 @@ on:
     branches: [nightly]
   pull_request_target: # needed for forked PRs
     branches: [nightly]
+  workflow_dispatch:
 
 jobs:
   publish-tauri:
@@ -13,9 +14,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
-
-    runs-on: ${{ matrix.platform }}
+        include:
+          - host: macos-latest
+            target: universal-apple-darwin
+            toolchain: aarch64-apple-darwin,x86_64-apple-darwin
+            bundles: app,dmg
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            toolchain: x86_64-pc-windows-msvc
+            bundles: msi,nsis
+            os: windows
+          - host: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            toolchain: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+    runs-on: ${{ matrix.host }}
     steps:
       - uses: actions/checkout@v3
       - name: setup node
@@ -24,8 +37,10 @@ jobs:
           node-version: latest
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          target: "${{ matrix.toolchain }}"
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-20.04'
+        if: matrix.host == 'ubuntu-20.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
@@ -35,12 +50,14 @@ jobs:
           version: latest
       - name: install frontend dependencies
         run: pnpm install # change this to npm or pnpm depending on which one you use
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@dev
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          # enable write perms in the actions -> settings and this will work
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
           tagName: GraphiteDesktop-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
           releaseName: "GraphiteDesktop v__VERSION__"
           releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: true
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}

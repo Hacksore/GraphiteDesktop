@@ -27,7 +27,7 @@
     },
     "bundle": {
       "active": true,
-      "targets": ["deb", "nsis", "msi", "app", "dmg", "updater"],
+      "targets": "all",
       "identifier": "com.glitchtech.graphitedesktop",
       "publisher": "GlitchTech Developments",
       "icon": [
